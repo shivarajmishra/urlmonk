@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SwiftLink | URL Shortener</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .glass-container { background: rgba(155,155,155,.2); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(155,155,255,.3); }
+    .spinner { display:none; }
+    .fade-in-up { opacity:0; transform: translateY(8px); transition: opacity .5s ease, transform .5s ease; }
+    .fade-in-up.show { opacity:1; transform: translateY(0); }
+    .dark-bg { background: linear-gradient(to bottom right,#111827,#c7093c,#1349a0); }
+  </style>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white transition-colors duration-300">
+  <button id="themeToggle" class="fixed top-4 right-4 bg-white/20 backdrop-blur px-3 py-1 rounded-lg hover:bg-white/30" title="Toggle dark theme">🌙</button>
+
+  <div class="container mx-auto p-4 flex justify-center items-center min-h-screen">
+    <div class="glass-container w-full max-w-3xl p-6 sm:p-8 rounded-2xl shadow-2xl">
+      <div class="flex items-center justify-center mb-6">
+        <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"/></svg>
+        <h1 class="text-3xl sm:text-4xl font-bold ml-3">SwiftLink</h1>
+      </div>
+      <p class="text-center text-indigo-200 mb-8">The fastest and simplest way to shorten your links.</p>
+
+      <!-- Form -->
+      <form id="shorten-form" class="flex flex-col sm:flex-row rounded-lg shadow-lg">
+        <label for="originalUrl" class="sr-only">Long URL</label>
+        <input id="originalUrl" type="url" required placeholder="Enter a long URL to shorten..."
+               class="flex-grow w-full py-3 px-4 bg-white/20 text-white placeholder-indigo-200 border border-transparent rounded-t-lg sm:rounded-l-lg sm:rounded-tr-none hover:border-white/40 focus:ring-2 focus:ring-white transition" />
+        <button id="submit-button" type="submit"
+                class="bg-white text-purple-600 font-bold py-3 px-6 rounded-b-lg sm:rounded-r-lg sm:rounded-bl-none hover:bg-indigo-100 focus:ring-2 focus:ring-white transition flex items-center gap-2 justify-center">
+          <span id="button-text">Shorten</span>
+          <svg id="spinner" class="spinner animate-spin h-5 w-5 text-purple-600" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>
+        </button>
+      </form>
+
+      <!-- Error -->
+      <div id="error" class="mt-3 hidden bg-red-500/60 text-white px-3 py-2 rounded-lg text-sm"></div>
+
+      <!-- Result + mini stats -->
+      <div id="result" class="mt-6 min-h-[80px] transition-all duration-500 ease-in-out"></div>
+
+      <!-- Recent links panel -->
+      <section class="mt-10">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold">Recent links</h2>
+          <button id="refreshRecent" class="text-sm bg-white/20 px-3 py-1 rounded-lg hover:bg-white/30">Refresh</button>
+        </div>
+        <div id="recent" class="grid gap-3 sm:grid-cols-2">
+          <!-- cards injected here -->
+        </div>
+      </section>
+
+      <footer class="mt-8 text-center text-indigo-200 text-sm">Built with ❤️ using Express + MongoDB</footer>
+
+      <!-- Mini Game: Whack-a-Link (moved inside the glass container) -->
+      <div class="mt-10 bg-white/20 rounded-2xl p-6 text-white">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="mr-2" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path></svg>
+            Whack-a-Link
+          </h2>
+          <div class="text-indigo-200">
+            <span class="mr-4">⏱️ Time: <span id="game-time">30</span>s</span>
+            <span>🎯 Score: <span id="game-score">0</span></span>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 mb-4">
+          <button id="game-start" class="bg-white text-purple-600 font-bold py-2 px-4 rounded-md hover:bg-indigo-100 transition">Start Game</button>
+          <button id="game-reset" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-md hover:bg-purple-700 transition hidden">Play Again</button>
+          <span id="game-status" class="text-indigo-200"></span>
+          <span class="ml-auto text-indigo-200">🏆 Best: <span id="game-best">0</span></span>
+        </div>
+
+        <div id="game-grid" class="grid grid-cols-3 gap-3 select-none">
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+          <button class="hole bg-white/10 rounded-xl h-24 relative focus:outline-none focus:ring-2 focus:ring-white"></button>
+        </div>
+      </div>
+      <!-- Snake & Mouse -->
+    <div id="snake-section" class="mt-10 bg-white/20 rounded-2xl p-6 text-white">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xl font-semibold flex items-center gap-2">
+          🐍 Snake & 🐭 Mouse
+        </h2>
+        <div class="text-indigo-200">
+          <span class="mr-4">🎯 Score: <span id="snake-score">0</span></span>
+          <span>🏆 Best: <span id="snake-best">0</span></span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-3 mb-4">
+        <button id="snake-start" class="bg-white text-purple-600 font-bold py-2 px-4 rounded-md hover:bg-indigo-100 transition">
+          Start
+        </button>
+        <button id="snake-reset" class="bg-purple-600 text-white font-bold py-2 px-4 rounded-md hover:bg-purple-700 transition">
+          Reset
+        </button>
+
+        <label class="text-indigo-100 ml-auto flex items-center gap-2">
+          Speed
+          <select id="snake-speed" class="bg-white/20 px-2 py-1 rounded-md hover:bg-white/30">
+            <option value="150">Slow</option>
+            <option value="110" selected>Normal</option>
+            <option value="80">Fast</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="relative mx-auto w-full max-w-[420px]">
+        <canvas id="snake-canvas" class="w-full rounded-xl border border-white/20 bg-slate-900/60"></canvas>
+        <div id="snake-status" class="absolute inset-x-0 top-2 text-center text-indigo-200 text-sm"></div>
+      </div>
+
+      <!-- Mobile D-pad -->
+      <div class="mt-4 grid grid-cols-3 gap-2 sm:hidden select-none">
+        <div></div>
+        <button class="dpad bg-white/20 rounded-md py-3 hover:bg-white/30" data-dir="up">▲</button>
+        <div></div>
+        <button class="dpad bg-white/20 rounded-md py-3 hover:bg-white/30" data-dir="left">◀</button>
+        <div></div>
+        <button class="dpad bg-white/20 rounded-md py-3 hover:bg-white/30" data-dir="right">▶</button>
+        <div></div>
+        <button class="dpad bg-white/20 rounded-md py-3 hover:bg-white/30" data-dir="down">▼</button>
+        <div></div>
+      </div>
+
+      <p class="mt-3 text-xs text-indigo-200 text-center">
+        Use arrow keys / WASD (or the on-screen arrows) to move. Eat the 🧀 (mouse) and don’t hit yourself!
+      </p>
+    </div>
+    </div>
+  </div>
+
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-lg shadow-lg hidden">Copied to clipboard ✅</div>
+
+  <script>
+    const form = document.getElementById('shorten-form');
+    const urlInput = document.getElementById('originalUrl');
+    const resultEl = document.getElementById('result');
+    const errorEl = document.getElementById('error');
+    const submitBtn = document.getElementById('submit-button');
+    const btnText = document.getElementById('button-text');
+    const spinner = document.getElementById('spinner');
+    const toast = document.getElementById('toast');
+    const recentWrap = document.getElementById('recent');
+    const refreshRecentBtn = document.getElementById('refreshRecent');
+    const themeToggle = document.getElementById('themeToggle');
+
+    // THEME
+    themeToggle.addEventListener('click', () => {
+      const body = document.body;
+      const isDark = body.classList.toggle('dark');
+      body.classList.toggle('dark-bg', isDark);
+      themeToggle.textContent = isDark ? '☀️' : '🌙';
+    });
+
+    // Helpers
+    function showToast(msg='Copied to clipboard ✅'){ toast.textContent = msg; toast.classList.remove('hidden'); setTimeout(()=>toast.classList.add('hidden'),1600); }
+    function looksLikeUrl(str){ try{ const u=new URL(str); return ['http:','https:'].includes(u.protocol);}catch{return false;} }
+    const fmt = (n)=> new Intl.NumberFormat().format(n);
+
+    async function copyText(text){
+      try{
+        if(navigator.clipboard?.writeText){ await navigator.clipboard.writeText(text); }
+        else { const ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+        showToast();
+      }catch{ showToast('Copy failed'); }
+    }
+
+    function renderResult({ shortUrl, originalUrl, shortUrlId, clicks }){
+      const html = `
+        <div id="result-card" class="fade-in-up bg-white/20 p-4 rounded-lg">
+          <p class="text-indigo-200 mb-2 text-center">Here’s your short link!</p>
+          <div class="flex items-center justify-between bg-white/10 p-2 rounded-md gap-2">
+            <a id="short-url-link" href="${shortUrl}" target="_blank" rel="noopener" class="font-semibold text-lg truncate hover:underline hover:text-indigo-50">${shortUrl}</a>
+            <div class="flex gap-2 shrink-0">
+              <button class="bg-purple-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-purple-700" data-copy="${shortUrl}">Copy</button>
+              <a href="${shortUrl}" target="_blank" rel="noopener" class="bg-white/20 text-white font-semibold py-2 px-4 rounded-md hover:bg-white/30">Open</a>
+            </div>
+          </div>
+          <div class="mt-3 grid grid-cols-3 gap-3">
+            <div class="bg-white/10 rounded-lg p-3 text-center">
+              <div class="text-xs text-indigo-100">Clicks</div>
+              <div id="liveClicks" class="text-2xl font-bold">${fmt(clicks ?? 0)}</div>
+            </div>
+            <div class="bg-white/10 rounded-lg p-3 text-center">
+              <div class="text-xs text-indigo-100">Created</div>
+              <div id="createdAtCell" class="text-sm">just now</div>
+            </div>
+            <div class="bg-white/10 rounded-lg p-3 text-center">
+              <div class="text-xs text-indigo-100">ID</div>
+              <div class="text-sm truncate">${shortUrlId}</div>
+            </div>
+          </div>
+        </div>
+      `;
+      resultEl.innerHTML = html;
+      requestAnimationFrame(()=>document.getElementById('result-card')?.classList.add('show'));
+      resultEl.querySelector('[data-copy]')?.addEventListener('click', (e)=>copyText(e.currentTarget.dataset.copy));
+
+      if(shortUrlId){
+        const interval = setInterval(async ()=>{
+          try{
+            const res = await fetch(`/api/stats/${encodeURIComponent(shortUrlId)}`);
+            if(!res.ok) return;
+            const s = await res.json();
+            const live = document.getElementById('liveClicks');
+            if(live) live.textContent = fmt(s.clicks ?? 0);
+          }catch{}
+        }, 10000);
+        form.addEventListener('submit', ()=>clearInterval(interval), { once:true });
+      }
+    }
+
+    function renderRecent(items=[]){
+      recentWrap.innerHTML = '';
+      if(!items.length){
+        recentWrap.innerHTML = '<div class="text-indigo-200">No links yet.</div>';
+        return;
+      }
+      for(const it of items){
+        const shortUrl = it.shortUrl || `${window.location.origin}/${it.shortUrlId}`;
+        const card = document.createElement('div');
+        card.className = 'bg-white/15 border border-white/10 rounded-xl p-4 shadow flex flex-col gap-2';
+        card.innerHTML = `
+          <a class="font-semibold hover:underline break-all" href="${shortUrl}" target="_blank" rel="noopener">${shortUrl}</a>
+          <p class="text-sm text-indigo-100 break-all">${it.originalUrl}</p>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-indigo-100">Clicks: <span class="font-semibold">${fmt(it.clicks ?? 0)}</span></span>
+            <div class="flex gap-2">
+              <button class="px-3 py-1 rounded-md bg-white/20 hover:bg-white/30" data-copy="${shortUrl}">Copy</button>
+              <a class="px-3 py-1 rounded-md bg-slate-900 text-white hover:bg-black" href="${shortUrl}" target="_blank" rel="noopener">Open</a>
+            </div>
+          </div>
+        `;
+        recentWrap.appendChild(card);
+        card.querySelector('[data-copy]')?.addEventListener('click',(e)=>copyText(e.currentTarget.dataset.copy));
+      }
+    }
+
+    async function loadRecent(){
+      try{
+        const res = await fetch('/api/recent?limit=8');
+        const data = await res.json().catch(()=>[]);
+        if(Array.isArray(data)) renderRecent(data);
+      }catch{ /* ignore */ }
+    }
+
+    refreshRecentBtn.addEventListener('click', loadRecent);
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      errorEl.classList.add('hidden');
+      resultEl.innerHTML = '';
+
+      const originalUrl = urlInput.value.trim();
+      try{
+        if(!looksLikeUrl(originalUrl)){
+          throw new Error('Please enter a valid URL starting with http:// or https://');
+        }
+
+        btnText.style.display = 'none'; spinner.style.display = 'block'; submitBtn.disabled = true;
+
+        const res = await fetch('/api/shorten', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ originalUrl })
+        });
+        const data = await res.json().catch(()=> ({}));
+        if(!res.ok) throw new Error(data?.error || 'Something went wrong. Please try again.');
+
+        const shortUrl = data.shortUrl || `${window.location.origin}/${data.shortUrlId}`;
+        renderResult({ shortUrl, originalUrl, shortUrlId: data.shortUrlId, clicks: data.clicks });
+        loadRecent();
+      }catch(err){
+        errorEl.textContent = err.message || 'Unexpected error';
+        errorEl.classList.remove('hidden');
+      }finally{
+        btnText.style.display = 'block'; spinner.style.display = 'none'; submitBtn.disabled = false;
+      }
+    });
+
+    // --- Whack-a-Link game ---
+    (function () {
+      const startBtn = document.getElementById('game-start');
+      const resetBtn = document.getElementById('game-reset');
+      const statusEl = document.getElementById('game-status');
+      const timeEl   = document.getElementById('game-time');
+      const scoreEl  = document.getElementById('game-score');
+      const bestEl   = document.getElementById('game-best');
+      const holes    = Array.from(document.querySelectorAll('#game-grid .hole'));
+
+      const ICON = `
+        <span class="link-icon absolute inset-0 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 animate-bounce" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.72"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.72-1.72"></path>
+          </svg>
+        </span>`;
+
+      let score = 0;
+      let timeLeft = 30;
+      let playing = false;
+      let popTimer = null;
+      let countdownTimer = null;
+      let activeHole = null;
+
+      const BEST_KEY = 'whackalink_best';
+      bestEl.textContent = localStorage.getItem(BEST_KEY) || '0';
+
+      function setStatus(msg) { statusEl.textContent = msg || ''; }
+      function clearIcon() { if (activeHole) activeHole.innerHTML = ''; activeHole = null; }
+
+      function popOnce() {
+        if (!playing) return;
+        clearIcon();
+        const hole = holes[Math.floor(Math.random() * holes.length)];
+        hole.innerHTML = ICON;
+        activeHole = hole;
+        const visibleMs = Math.max(500, 1000 - score * 20);
+        popTimer = setTimeout(popOnce, visibleMs);
+      }
+
+      function startGame() {
+        if (playing) return;
+        score = 0; timeLeft = 30; playing = true;
+        scoreEl.textContent = '0';
+        timeEl.textContent = String(timeLeft);
+        setStatus('Go!');
+        resetBtn.classList.add('hidden');
+        startBtn.disabled = true;
+
+        popOnce();
+        countdownTimer = setInterval(() => {
+          timeLeft--;
+          timeEl.textContent = String(timeLeft);
+          if (timeLeft <= 0) endGame();
+        }, 1000);
+      }
+
+      function endGame() {
+        playing = false;
+        clearTimeout(popTimer);
+        clearInterval(countdownTimer);
+        clearIcon();
+        setStatus('Time up!');
+        const best = Math.max(Number(localStorage.getItem(BEST_KEY) || 0), score);
+        localStorage.setItem(BEST_KEY, String(best));
+        bestEl.textContent = String(best);
+        startBtn.disabled = false;
+        resetBtn.classList.remove('hidden');
+      }
+
+      holes.forEach(hole => {
+        hole.addEventListener('click', () => {
+          if (!playing) return;
+          if (hole === activeHole) {
+            score++;
+            scoreEl.textContent = String(score);
+            hole.classList.add('ring-2','ring-white');
+            setTimeout(() => hole.classList.remove('ring-2','ring-white'), 150);
+            clearIcon();
+          }
+        });
+      });
+
+      startBtn.addEventListener('click', startGame);
+      resetBtn.addEventListener('click', startGame);
+    })();
+
+    // Initial load
+    loadRecent();
+  </script>
+    // --- Snake & Mouse game ---
+  (function () {
+    const canvas = document.getElementById('snake-canvas');
+    const ctx = canvas.getContext('2d');
+
+    const startBtn = document.getElementById('snake-start');
+    const resetBtn = document.getElementById('snake-reset');
+    const speedSel = document.getElementById('snake-speed');
+    const scoreEl  = document.getElementById('snake-score');
+    const bestEl   = document.getElementById('snake-best');
+    const statusEl = document.getElementById('snake-status');
+
+    const dpadBtns = Array.from(document.querySelectorAll('#snake-section .dpad'));
+
+    // Canvas sizing with DPR for crispness
+    const DPR = window.devicePixelRatio || 1;
+    const VIEW_SIZE = 420;           // CSS px
+    const COLS = 21, ROWS = 21;      // grid
+    const CELL = VIEW_SIZE / COLS;
+
+    function setupCanvas() {
+      canvas.style.width = VIEW_SIZE + 'px';
+      canvas.style.height = VIEW_SIZE + 'px';
+      canvas.width  = Math.floor(VIEW_SIZE * DPR);
+      canvas.height = Math.floor(VIEW_SIZE * DPR);
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    setupCanvas();
+    window.addEventListener('resize', setupCanvas);
+
+    // State
+    const BEST_KEY = 'snake_best';
+    let best = Number(localStorage.getItem(BEST_KEY) || 0);
+    bestEl.textContent = String(best);
+
+    let tickMs = Number(speedSel.value);  // speed in ms
+    let running = false;
+    let timer = null;
+
+    let dir = { x: 1, y: 0 };        // start moving right
+    let nextDir = { x: 1, y: 0 };    // queued direction
+    let snake = [];                  // array of {x,y}, head at [0]
+    let food = null;                 // {x,y}
+    let score = 0;
+
+    function resetGame() {
+      score = 0;
+      scoreEl.textContent = '0';
+      statusEl.textContent = '';
+
+      // centered start
+      const cx = Math.floor(COLS / 2);
+      const cy = Math.floor(ROWS / 2);
+      snake = [{ x: cx, y: cy }, { x: cx - 1, y: cy }];
+      dir = { x: 1, y: 0 };
+      nextDir = { x: 1, y: 0 };
+
+      placeFood();
+      draw();
+    }
+
+    function cellEq(a, b) { return a.x === b.x && a.y === b.y; }
+
+    function placeFood() {
+      // try to place food not on snake
+      let tries = 0;
+      do {
+        food = {
+          x: Math.floor(Math.random() * COLS),
+          y: Math.floor(Math.random() * ROWS),
+        };
+        tries++;
+        if (tries > 1000) break; // emergency escape (very unlikely)
+      } while (snake.some(s => cellEq(s, food)));
+    }
+
+    function start() {
+      if (running) return;
+      running = true;
+      startBtn.textContent = 'Pause';
+      statusEl.textContent = '';
+      timer = setInterval(tick, tickMs);
+    }
+
+    function pause() {
+      running = false;
+      startBtn.textContent = 'Start';
+      clearInterval(timer);
+      timer = null;
+      statusEl.textContent = 'Paused';
+    }
+
+    function gameOver() {
+      pause();
+      statusEl.textContent = 'Game over!';
+      best = Math.max(best, score);
+      localStorage.setItem(BEST_KEY, String(best));
+      bestEl.textContent = String(best);
+    }
+
+    function setSpeed(ms) {
+      tickMs = ms;
+      if (running) {
+        clearInterval(timer);
+        timer = setInterval(tick, tickMs);
+      }
+    }
+
+    function setDirection(nx, ny) {
+      // prevent instant 180° reversal
+      if (snake.length > 1 && nx === -dir.x && ny === -dir.y) return;
+      nextDir = { x: nx, y: ny };
+    }
+
+    // Input: keyboard
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W': setDirection(0, -1); break;
+        case 'ArrowDown': case 's': case 'S': setDirection(0, 1); break;
+        case 'ArrowLeft': case 'a': case 'A': setDirection(-1, 0); break;
+        case 'ArrowRight': case 'd': case 'D': setDirection(1, 0); break;
+        case ' ': // space to pause/resume
+          running ? pause() : start();
+          break;
+      }
+    });
+
+    // Input: mobile D-pad
+    dpadBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const d = btn.dataset.dir;
+        if (d === 'up') setDirection(0, -1);
+        if (d === 'down') setDirection(0, 1);
+        if (d === 'left') setDirection(-1, 0);
+        if (d === 'right') setDirection(1, 0);
+      });
+    });
+
+    // Controls
+    startBtn.addEventListener('click', () => running ? pause() : start());
+    resetBtn.addEventListener('click', () => { resetGame(); pause(); });
+    speedSel.addEventListener('change', () => setSpeed(Number(speedSel.value)));
+
+    function tick() {
+      // apply queued direction once per tick
+      dir = nextDir;
+
+      const head = snake[0];
+      let nx = head.x + dir.x;
+      let ny = head.y + dir.y;
+
+      // wrap around edges (optional: replace with gameOver on wall hit)
+      if (nx < 0) nx = COLS - 1;
+      if (ny < 0) ny = ROWS - 1;
+      if (nx >= COLS) nx = 0;
+      if (ny >= ROWS) ny = 0;
+
+      const newHead = { x: nx, y: ny };
+
+      // self-collision?
+      if (snake.some((s, i) => i !== 0 && cellEq(s, newHead))) {
+        gameOver();
+        return;
+      }
+
+      // move
+      snake.unshift(newHead);
+
+      // eat?
+      if (cellEq(newHead, food)) {
+        score++;
+        scoreEl.textContent = String(score);
+        placeFood();
+        // optional: speed up slightly as score grows
+        // if (tickMs > 60 && score % 5 === 0) setSpeed(tickMs - 5);
+      } else {
+        snake.pop();
+      }
+
+      draw();
+    }
+
+    // Rendering
+    function draw() {
+      // bg
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)'; // slate-900/80
+      ctx.fillRect(0, 0, VIEW_SIZE, VIEW_SIZE);
+
+      // subtle grid (optional)
+      ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 1;
+      for (let x = 1; x < COLS; x++) {
+        const px = x * CELL + 0.5;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, VIEW_SIZE); ctx.stroke();
+      }
+      for (let y = 1; y < ROWS; y++) {
+        const py = y * CELL + 0.5;
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(VIEW_SIZE, py); ctx.stroke();
+      }
+
+      // food (mouse = cheese 🧀)
+      drawCell(food.x, food.y, '#fde68a'); // amber-300
+      drawEmoji(food.x, food.y, '🧀');
+
+      // snake
+      for (let i = snake.length - 1; i >= 0; i--) {
+        const seg = snake[i];
+        const isHead = i === 0;
+        ctx.fillStyle = isHead ? '#a78bfa' : '#c4b5fd'; // violet-400/300
+        roundRect(seg.x * CELL + 2, seg.y * CELL + 2, CELL - 4, CELL - 4, 6);
+        ctx.fill();
+
+        if (isHead) {
+          // eyes
+          ctx.fillStyle = '#111827';
+          const cx = seg.x * CELL, cy = seg.y * CELL;
+          ctx.beginPath(); ctx.arc(cx + CELL*0.35, cy + CELL*0.35, 2, 0, Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(cx + CELL*0.65, cy + CELL*0.35, 2, 0, Math.PI*2); ctx.fill();
+        }
+      }
+    }
+
+    function drawCell(x, y, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(x * CELL + 2, y * CELL + 2, CELL - 4, CELL - 4);
+    }
+
+    function drawEmoji(x, y, emoji) {
+      ctx.font = `${Math.floor(CELL*0.8)}px system-ui, Apple Color Emoji, Segoe UI Emoji`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(emoji, x * CELL + CELL/2, y * CELL + CELL/2 + 1);
+    }
+
+    function roundRect(x, y, w, h, r) {
+      const rr = Math.min(r, w/2, h/2);
+      ctx.beginPath();
+      ctx.moveTo(x+rr, y);
+      ctx.arcTo(x+w, y, x+w, y+h, rr);
+      ctx.arcTo(x+w, y+h, x, y+h, rr);
+      ctx.arcTo(x, y+h, x, y, rr);
+      ctx.arcTo(x, y, x+w, y, rr);
+      ctx.closePath();
+    }
+
+    // boot
+    resetGame();
+  })();
+
+</body>
+</html>
