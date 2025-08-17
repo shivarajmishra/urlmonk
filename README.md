@@ -1,16 +1,16 @@
-# SwiftLink - A Simple & Beautiful URL Shortener
+# URLmonk - A Simple & Beautiful URL Shortener
 
-![SwiftLink Screenshot](swiftlink.png)
+![URLmonk Screenshot](URLmonk.png)
 
-**SwiftLink** is a clean, modern, and efficient URL shortening service built with Node.js, Express, and MongoDB. It provides a simple API to create short links and redirects users to the original long URL, tracking the number of clicks along the way.
+**URLmonk** is a clean, modern, and efficient URL shortening service built with Node.js, Express, and MongoDB. It provides a simple API to create short links and redirects users to the original long URL, tracking the number of clicks along the way.
 
-**Live Demo:** [**https://swiftlink-60ht.onrender.com/**](https://swiftlink-60ht.onrender.com/)
+**Live Demo:** [**https://URLmonk-60ht.onrender.com/**](https://URLmonk-60ht.onrender.com/)
 
 ---
 
 ## ✨ Features
 
--   **Shorten Long URLs:** Convert any long URL into a short, easy-to-share SwiftLink.
+-   **Shorten Long URLs:** Convert any long URL into a short, easy-to-share URLmonk.
 -   **Seamless Redirection:** Short links automatically and quickly redirect to the original destination.
 -   **Click Tracking:** Each click on a short link is counted, providing basic analytics.
 -   **Sleek & Modern UI:** A beautiful, responsive frontend with a glass-morphism design, built with Tailwind CSS.
